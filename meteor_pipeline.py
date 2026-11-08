@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 # GRAVES Radar Frekansı: 143.050 MHz (USB modunda ~1000 Hz ses tonu hedeflenir)
 SAMPLE_RATE = 12000
- RADAR_FREQ_HZ = 143.05e6
+RADAR_FREQ_HZ = 143.05e6
 LAMBDA_M = 3.0e8 / RADAR_FREQ_HZ  # ~2.097 metre
 
 os.makedirs("data/events_wav", exist_ok=True)
