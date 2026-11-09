@@ -119,20 +119,17 @@ def run_capture(shower_label, duration_hours, stream_host, stream_port, start_ut
     chunk_samples = SAMPLE_RATE * 5  # 5 saniyelik pencereler
 
     while time.time() < end_time:
-        # Aktif vardiya saati kontrolü (UTC cinsinden)
         current_utc_hour = datetime.datetime.utcnow().hour
-        if start_utc <= end_utc:
-            in_window = (start_utc <= current_utc_hour < end_utc)
-        else:
-            # Gece yarısını geçen aralıklar için (örn. 21 -> 03)
-            in_window = (current_utc_hour >= start_utc or current_utc_hour < end_utc)
 
-        if not in_window:
-            time.sleep(30)
+        if start_utc <= current_utc_hour < end_utc:
+            pass
+        elif (start_utc - current_utc_hour) % 24 <= 5:
+            time.sleep(20)
             continue
+        else:
+            break
 
         try:
-            # Açık KiwiSDR/WebSDR PCM akış soketi veya yedek RF simülasyon/stream okuyucu
             raw_audio = np.random.normal(0, 0.02, chunk_samples)
             if stream_host:
                 with socket.create_connection((stream_host, stream_port), timeout=10) as sock:
@@ -144,7 +141,6 @@ def run_capture(shower_label, duration_hours, stream_host, stream_port, start_ut
             continue
 
         filtered = bandpass_filter(raw_audio)
-        # CFAR (4-Sigma Dinamik Eşik Kontrolü)
         envelope = np.abs(signal.hilbert(filtered))
         median_env = np.median(envelope)
         std_env = np.std(envelope)
