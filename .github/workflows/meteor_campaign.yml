@@ -2,18 +2,19 @@ name: Autonomous Meteor Radar Campaign
 
 on:
   schedule:
-    # 10, 11, 12 Kasım (Taurid) | 14 Kasım (Kontrol) | 16, 17, 18 Kasım (Leonid)
-    # Saat 19:00 UTC = Türkiye Saati ile 22:00
-  - cron: '0 19 8-20 11 *'
-  workflow_dispatch: # İstersen tek tuşla manuel test başlatmak için
+    # 8-20 Kasım arası her gün
+    - cron: '30 15 8-20 11 *' # Vardiya 1: 18:30 TRT
+    - cron: '30 18 8-20 11 *' # Vardiya 2: 21:30 TRT
+    - cron: '0 21 8-20 11 *'  # Vardiya 3: 00:00 TRT
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  shift_1_2200_to_0200:
+  shift_1:
     runs-on: ubuntu-latest
-    timeout-minutes: 260
+    timeout-minutes: 340
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
@@ -26,24 +27,24 @@ jobs:
       - name: Install Dependencies
         run: pip install numpy scipy pandas matplotlib
 
-      - name: Run Shift 1 (22:00 - 02:00 TRT)
+      - name: Run Shift 1 (21:00 - 00:00 TRT)
         run: |
           DAY=$(date -u +%d)
           if [ "$DAY" -le 12 ]; then SHOWER="Taurid"; elif [ "$DAY" -eq 14 ]; then SHOWER="Control"; else SHOWER="Leonid"; fi
-          python meteor_pipeline.py --shower $SHOWER --hours 3.9
+          python meteor_pipeline.py --shower $SHOWER --hours 5.2 --start-utc 18 --end-utc 21
 
-      - name: Auto-Commit Shift 1 Data
+      - name: Commit Shift 1
         run: |
           git config user.name "MeteorBot"
           git config user.email "bot@iztech-astro.org"
+          git pull --rebase
           git add data/meteor_catalog.csv data/plots/
-          git commit -m "Auto-save Shift 1 meteor data" || echo "No new events"
+          git commit -m "Auto-save Shift 1 meteor data" || echo "No changes"
           git push
 
-  shift_2_0200_to_0600:
-    needs: shift_1_2200_to_0200
+  shift_2:
     runs-on: ubuntu-latest
-    timeout-minutes: 260
+    timeout-minutes: 340
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
@@ -56,17 +57,48 @@ jobs:
       - name: Install Dependencies
         run: pip install numpy scipy pandas matplotlib
 
-      - name: Run Shift 2 (02:00 - 06:00 TRT) & Update Plots
+      - name: Run Shift 2 (00:00 - 03:00 TRT)
         run: |
           DAY=$(date -u +%d)
           if [ "$DAY" -le 12 ]; then SHOWER="Taurid"; elif [ "$DAY" -eq 14 ]; then SHOWER="Control"; else SHOWER="Leonid"; fi
-          python meteor_pipeline.py --shower $SHOWER --hours 3.9
-          python meteor_pipeline.py --analyze
+          python meteor_pipeline.py --shower $SHOWER --hours 5.2 --start-utc 21 --end-utc 24
 
-      - name: Auto-Commit Shift 2 Data & Final Plots
+      - name: Commit Shift 2
         run: |
           git config user.name "MeteorBot"
           git config user.email "bot@iztech-astro.org"
+          git pull --rebase
           git add data/meteor_catalog.csv data/plots/
-          git commit -m "Auto-save Shift 2 data and updated K-S plots" || echo "No changes"
+          git commit -m "Auto-save Shift 2 meteor data" || echo "No changes"
+          git push
+
+  shift_3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: pip install numpy scipy pandas matplotlib
+
+      - name: Run Shift 3 (03:00 - 06:30 TRT) & Update Analysis
+        run: |
+          DAY=$(date -u +%d)
+          if [ "$DAY" -le 12 ]; then SHOWER="Taurid"; elif [ "$DAY" -eq 14 ]; then SHOWER="Control"; else SHOWER="Leonid"; fi
+          python meteor_pipeline.py --shower $SHOWER --hours 5.2 --start-utc 0 --end-utc 4
+          python meteor_pipeline.py --analyze
+
+      - name: Commit Shift 3 & Final Plots
+        run: |
+          git config user.name "MeteorBot"
+          git config user.email "bot@iztech-astro.org"
+          git pull --rebase
+          git add data/meteor_catalog.csv data/plots/
+          git commit -m "Auto-save Shift 3 data and final plots" || echo "No changes"
           git push
