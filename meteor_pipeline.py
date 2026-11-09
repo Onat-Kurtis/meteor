@@ -113,12 +113,24 @@ def extract_physics_and_save(audio_clip, fs, shower_label, event_id, timestamp_s
     df_row = pd.DataFrame([row])
     df_row.to_csv(CSV_PATH, mode='a', header=not os.path.exists(CSV_PATH), index=False)
 
-def run_capture(shower_label, duration_hours, stream_host, stream_port):
+def run_capture(shower_label, duration_hours, stream_host, stream_port, start_utc=0, end_utc=24):
     end_time = time.time() + int(duration_hours * 3600)
     event_counter = int(time.time()) % 100000
     chunk_samples = SAMPLE_RATE * 5  # 5 saniyelik pencereler
 
     while time.time() < end_time:
+        # Aktif vardiya saati kontrolü (UTC cinsinden)
+        current_utc_hour = datetime.datetime.utcnow().hour
+        if start_utc <= end_utc:
+            in_window = (start_utc <= current_utc_hour < end_utc)
+        else:
+            # Gece yarısını geçen aralıklar için (örn. 21 -> 03)
+            in_window = (current_utc_hour >= start_utc or current_utc_hour < end_utc)
+
+        if not in_window:
+            time.sleep(30)
+            continue
+
         try:
             # Açık KiwiSDR/WebSDR PCM akış soketi veya yedek RF simülasyon/stream okuyucu
             raw_audio = np.random.normal(0, 0.02, chunk_samples)
@@ -182,10 +194,12 @@ if __name__ == "__main__":
     parser.add_argument("--hours", type=float, default=4.0)
     parser.add_argument("--host", type=str, default="")
     parser.add_argument("--port", type=int, default=8073)
+    parser.add_argument("--start-utc", type=int, default=0, help="Kayıt başlangıç UTC saati")
+    parser.add_argument("--end-utc", type=int, default=24, help="Kayıt bitiş UTC saati")
     parser.add_argument("--analyze", action="store_true")
     args = parser.parse_args()
 
     if args.analyze:
         run_final_analysis()
     else:
-        run_capture(args.shower, args.hours, args.host, args.port)
+        run_capture(args.shower, args.hours, args.host, args.port, args.start_utc, args.end_utc)
