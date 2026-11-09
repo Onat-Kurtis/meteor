@@ -2,10 +2,10 @@ name: Autonomous Meteor Radar Campaign
 
 on:
   schedule:
-    # 8-20 Kasım arası her gün
-    - cron: '30 15 8-20 11 *' # Vardiya 1: 18:30 TRT
-    - cron: '30 18 8-20 11 *' # Vardiya 2: 21:30 TRT
-    - cron: '0 21 8-20 11 *'  # Vardiya 3: 00:00 TRT
+    # 8-20 Kasim arasi her gun
+    - cron: '30 15 8-20 11 *' # Vardiya 1: 18:30 TRT tetikleme -> 21:00-00:00 TRT kayit
+    - cron: '30 18 8-20 11 *' # Vardiya 2: 21:30 TRT tetikleme -> 00:00-03:00 TRT kayit
+    - cron: '30 21 8-20 11 *' # Vardiya 3: 00:30 TRT tetikleme -> 03:00-06:00 TRT kayit
   workflow_dispatch:
 
 permissions:
@@ -13,8 +13,9 @@ permissions:
 
 jobs:
   shift_1:
+    if: github.event.schedule == '30 15 8-20 11 *' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 340
+    timeout-minutes: 350
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
@@ -31,20 +32,34 @@ jobs:
         run: |
           DAY=$(date -u +%d)
           if [ "$DAY" -le 12 ]; then SHOWER="Taurid"; elif [ "$DAY" -eq 14 ]; then SHOWER="Control"; else SHOWER="Leonid"; fi
-          python meteor_pipeline.py --shower $SHOWER --hours 5.2 --start-utc 18 --end-utc 21
+          python meteor_pipeline.py --shower $SHOWER --hours 5.5 --start-utc 18 --end-utc 21
 
-      - name: Commit Shift 1
+      - name: Safe Merge & Commit Shift 1
         run: |
           git config user.name "MeteorBot"
           git config user.email "bot@iztech-astro.org"
+          cp data/meteor_catalog.csv /tmp/new_catalog.csv || true
+          git checkout -- .
           git pull --rebase
+          python -c "
+          import pandas as pd, os
+          if os.path.exists('/tmp/new_catalog.csv'):
+              df_new = pd.read_csv('/tmp/new_catalog.csv')
+              if os.path.exists('data/meteor_catalog.csv'):
+                  df_old = pd.read_csv('data/meteor_catalog.csv')
+                  df_merged = pd.concat([df_old, df_new]).drop_duplicates(subset=['event_id'])
+              else:
+                  df_merged = df_new
+              df_merged.to_csv('data/meteor_catalog.csv', index=False)
+          "
           git add data/meteor_catalog.csv data/plots/
           git commit -m "Auto-save Shift 1 meteor data" || echo "No changes"
           git push
 
   shift_2:
+    if: github.event.schedule == '30 18 8-20 11 *'
     runs-on: ubuntu-latest
-    timeout-minutes: 340
+    timeout-minutes: 350
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
@@ -61,20 +76,34 @@ jobs:
         run: |
           DAY=$(date -u +%d)
           if [ "$DAY" -le 12 ]; then SHOWER="Taurid"; elif [ "$DAY" -eq 14 ]; then SHOWER="Control"; else SHOWER="Leonid"; fi
-          python meteor_pipeline.py --shower $SHOWER --hours 5.2 --start-utc 21 --end-utc 24
+          python meteor_pipeline.py --shower $SHOWER --hours 5.5 --start-utc 21 --end-utc 24
 
-      - name: Commit Shift 2
+      - name: Safe Merge & Commit Shift 2
         run: |
           git config user.name "MeteorBot"
           git config user.email "bot@iztech-astro.org"
+          cp data/meteor_catalog.csv /tmp/new_catalog.csv || true
+          git checkout -- .
           git pull --rebase
+          python -c "
+          import pandas as pd, os
+          if os.path.exists('/tmp/new_catalog.csv'):
+              df_new = pd.read_csv('/tmp/new_catalog.csv')
+              if os.path.exists('data/meteor_catalog.csv'):
+                  df_old = pd.read_csv('data/meteor_catalog.csv')
+                  df_merged = pd.concat([df_old, df_new]).drop_duplicates(subset=['event_id'])
+              else:
+                  df_merged = df_new
+              df_merged.to_csv('data/meteor_catalog.csv', index=False)
+          "
           git add data/meteor_catalog.csv data/plots/
           git commit -m "Auto-save Shift 2 meteor data" || echo "No changes"
           git push
 
   shift_3:
+    if: github.event.schedule == '30 21 8-20 11 *'
     runs-on: ubuntu-latest
-    timeout-minutes: 340
+    timeout-minutes: 350
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
@@ -87,18 +116,31 @@ jobs:
       - name: Install Dependencies
         run: pip install numpy scipy pandas matplotlib
 
-      - name: Run Shift 3 (03:00 - 06:30 TRT) & Update Analysis
+      - name: Run Shift 3 (03:00 - 06:00 TRT)
         run: |
           DAY=$(date -u +%d)
           if [ "$DAY" -le 12 ]; then SHOWER="Taurid"; elif [ "$DAY" -eq 14 ]; then SHOWER="Control"; else SHOWER="Leonid"; fi
-          python meteor_pipeline.py --shower $SHOWER --hours 5.2 --start-utc 0 --end-utc 4
-          python meteor_pipeline.py --analyze
+          python meteor_pipeline.py --shower $SHOWER --hours 5.5 --start-utc 0 --end-utc 3
 
-      - name: Commit Shift 3 & Final Plots
+      - name: Safe Merge, Analyze & Commit Shift 3
         run: |
           git config user.name "MeteorBot"
           git config user.email "bot@iztech-astro.org"
+          cp data/meteor_catalog.csv /tmp/new_catalog.csv || true
+          git checkout -- .
           git pull --rebase
+          python -c "
+          import pandas as pd, os
+          if os.path.exists('/tmp/new_catalog.csv'):
+              df_new = pd.read_csv('/tmp/new_catalog.csv')
+              if os.path.exists('data/meteor_catalog.csv'):
+                  df_old = pd.read_csv('data/meteor_catalog.csv')
+                  df_merged = pd.concat([df_old, df_new]).drop_duplicates(subset=['event_id'])
+              else:
+                  df_merged = df_new
+              df_merged.to_csv('data/meteor_catalog.csv', index=False)
+          "
+          python meteor_pipeline.py --analyze
           git add data/meteor_catalog.csv data/plots/
           git commit -m "Auto-save Shift 3 data and final plots" || echo "No changes"
           git push
